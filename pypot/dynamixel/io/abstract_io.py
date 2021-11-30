@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import time
 import serial
 import logging
 import operator
@@ -507,7 +508,19 @@ class AbstractDxlIO(object):
 
     def __real_read(self, instruction_packet, _force_lock):
         with self.__force_lock(_force_lock) or self._serial_lock:
-            data = self._serial.read(self._protocol.DxlPacketHeader.length)
+            start = time.time()
+            data = b''
+            while time.time() - start < 0.05 and len(data) < self._protocol.DxlPacketHeader.length:
+                c = self._serial.read()
+                if c:
+                    if len(data) < len(self._protocol.DxlPacketHeader.marker):
+                        if c == b'%c' % self._protocol.DxlPacketHeader.marker[len(data)]:
+                            data += c
+                        else:
+                            data = b''
+                    else:
+                        data += c
+
             if not data:
                 raise DxlTimeoutError(self, instruction_packet, instruction_packet.id)
 
